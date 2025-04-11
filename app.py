@@ -35,7 +35,7 @@ with st.expander("⚠️ Important Model Notes", expanded=True):
        - Objects placed on solid surfaces
     
     3. **Performance Notes**  
-       Detection quality decreases when:
+       Detection quality could decreases when:
        - Objects overlap or are too close
        - Backgrounds are cluttered
        - Lighting is uneven or creates shadows
