@@ -7,7 +7,7 @@
                 
     **Current Limitations:**
                 
-    Keep in mind that the models will be used in an environment where only such conditions will exists so there will
+    Keep in mind that the models will be used in an environment where only such conditions will exists for the solution so there will
     be some limitations such as:
                 
     1. **Single-Class Detection Preference**  
