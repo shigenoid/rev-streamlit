@@ -7,8 +7,8 @@
                 
     **Current Limitations:**
                 
-    Keep in mind that the models will be used in an environment where only such conditions will exists for the solution so there will
-    be some limitations such as:
+    Keep in mind that the models will be used in an environment where only such conditions 
+    will exists for the solution so there will be some limitations such as:
                 
     1. **Single-Class Detection Preference**  
        The model tends to detect only the most prominent object in a frame when multiple objects are present.  
