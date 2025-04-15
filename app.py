@@ -8,6 +8,7 @@ import paho.mqtt.client as mqtt
 import os
 from dotenv import load_dotenv
 import time
+from streamlit_webrtc import webrtc_streamer, WebRTCStreamerContext
 
 # Load environment variables
 load_dotenv()
@@ -45,36 +46,27 @@ with st.sidebar.expander("🔌 MQTT Connection Status", expanded=True):
 # ===== Model Information Section =====
 with st.expander("⚠️ Important Model Notes", expanded=True):
     st.markdown("""
-    **Model Specifications:**
-                
-    This model's purpose was to detect a type of bottles based on its material 
-                
+    **Model Specifications:**                
+    This model's purpose was to detect a type of bottles based on its material                 
     - **List of classes:** 
-      - 🥫 can-bottle | 🧴 plastic-bottle | 🍾 glass-bottle | 📦 tetrapak
-                
-    **Current Limitations:**
-                
+      - 🥫 can-bottle | 🧴 plastic-bottle | 🍾 glass-bottle | 📦 tetrapak                
+    **Current Limitations:**                
     Keep in mind that the models will be used in an environment where only such conditions will exists so there will
-    be some limitations such as:
-                
+    be some limitations such as:                
     1. **Single-Class Detection Preference**  
-       The model tends to detect only the most prominent object in a frame when multiple objects are present.  
-    
+       The model tends to detect only the most prominent object in a frame when multiple objects are present.      
     2. **Optimal Detection Conditions**  
        Works best with:
        - Single objects centered in frame
        - Flat, uniform backgrounds (like conveyor belts)
        - Good lighting conditions
-       - Objects placed on solid surfaces
-    
+       - Objects placed on solid surfaces    
     3. **Performance Notes**  
        Detection quality could decreases when:
        - Objects overlap or are too close
        - Backgrounds are cluttered
        - Lighting is uneven or creates shadows
     """)
-
-st.warning("Also you can change the model to model-2.pt if model-1.pt seemed to be more unstable (change it in app.py)")
 
 # Input type selection
 input_type = st.sidebar.radio(
@@ -87,8 +79,8 @@ if 'last_publish_time' not in st.session_state:
     st.session_state.last_publish_time = 0
 PUBLISH_INTERVAL = 3  # Seconds
 
-def process_frame(frame):
-    """Process frame and return both results and annotated image"""
+def process_frame(frame: np.ndarray):
+    """Process frame and return annotated image"""
     results = model.predict(frame, conf=0.6)
     detected_classes = set()
     
@@ -108,29 +100,21 @@ def process_frame(frame):
         except Exception as e:
             st.sidebar.error(f"MQTT Publish Error: {str(e)}")
     
-    return results[0].plot(), detected_classes
+    return results[0].plot()
 
 # ===== Image Upload =====
 if input_type == "Image Upload":
-    img_file = st.file_uploader(
-        "Upload Image", 
-        type=["jpg", "jpeg", "png"]
-    )
+    img_file = st.file_uploader("Upload Image", type=["jpg", "jpeg", "png"])
     
     if img_file is not None:
         image = Image.open(img_file)
         image_np = np.array(image)
-        
-        processed_image, detected = process_frame(image_np)
+        processed_image = process_frame(image_np)
         st.image(processed_image, caption="Processed Image", use_column_width=True)
-        st.write(f"**Detected Objects:** {', '.join(detected) if detected else 'No objects detected'}")
 
 # ===== Video Upload =====
 elif input_type == "Video Upload":
-    video_file = st.file_uploader(
-        "Upload Video", 
-        type=["mp4", "avi", "mov"]
-    )
+    video_file = st.file_uploader("Upload Video", type=["mp4", "avi", "mov"])
     
     if video_file is not None:
         tfile = tempfile.NamedTemporaryFile(delete=False)
@@ -144,48 +128,34 @@ elif input_type == "Video Upload":
             if not ret:
                 break
             
-            processed_frame, detected = process_frame(frame)
+            processed_frame = process_frame(frame)
             stframe.image(processed_frame, channels="BGR")
         
         cap.release()
 
 # ===== Webcam =====
 elif input_type == "Webcam":
-    st.warning("⚠️ Webcam access requires browser permission")
+    st.warning("⚠️ Allow browser camera access when prompted")
     
-    if 'cam_active' not in st.session_state:
-        st.session_state.cam_active = False
-    
-    video_placeholder = st.empty()
-    
-    start_button, stop_button = st.columns(2)
-    
-    with start_button:
-        if st.button("Start Webcam"):
-            st.session_state.cam_active = True
-    
-    with stop_button:
-        if st.button("Stop Webcam"):
-            st.session_state.cam_active = False
-    
-    if st.session_state.cam_active:
-        cap = cv2.VideoCapture(0)
-        
-        try:
-            while st.session_state.cam_active:
-                ret, frame = cap.read()
-                if not ret:
-                    st.error("Failed to capture frame")
-                    break
-                
-                frame = cv2.flip(frame, 1)
-                processed_frame, detected = process_frame(frame)
-                processed_frame_rgb = cv2.cvtColor(processed_frame, cv2.COLOR_BGR2RGB)
-                video_placeholder.image(processed_frame_rgb, channels="RGB")
-                
-        finally:
-            cap.release()
-            st.session_state.cam_active = False
+    ctx = webrtc_streamer(
+        key="object-detection",
+        mode=WebRTCStreamerContext.SENDRECV,
+        rtc_configuration={
+            "iceServers": [{"urls": ["stun:stun.l.google.com:19302"]}]
+        },
+        video_frame_callback=lambda frame: process_frame(frame.to_ndarray(format="bgr24")),
+        media_stream_constraints={
+            "video": {
+                "width": {"min": 640, "ideal": 1280},
+                "height": {"min": 480, "ideal": 720}
+            },
+            "audio": False
+        },
+        async_processing=True
+    )
+
+    if ctx.state.playing:
+        st.info("Live webcam processing active! Detection results appear below.")
 
 # Cleanup when app stops
 def on_app_close():
