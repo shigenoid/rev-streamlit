@@ -85,6 +85,11 @@ input_type = st.sidebar.radio(
 # Throttling configuration
 PUBLISH_INTERVAL = 3  # Seconds
 
+# ... (previous imports and setup remain the same)
+
+# Throttling configuration
+PUBLISH_INTERVAL = 3  # Seconds
+
 class VideoProcessor:
     def __init__(self):
         self.last_publish = 0
@@ -102,15 +107,18 @@ class VideoProcessor:
                     cls_id = int(box.cls.item())
                     detected_classes.add(model.names[cls_id])
             
-            msg = ",".join(detected_classes) if detected_classes else "NONE"
-            try:
-                st.session_state.mqttc.publish(os.getenv("MQTT_TOPIC"), msg)
-                self.last_publish = current_time
-                st.sidebar.success(f"Published: {msg}")
-            except Exception as e:
-                st.sidebar.error(f"MQTT Error: {str(e)}")
+            self.publish_detection(detected_classes)
+            self.last_publish = current_time
         
         return av.VideoFrame.from_ndarray(results[0].plot(), format="bgr24")
+
+    def publish_detection(self, detected_classes):
+        msg = ",".join(detected_classes) if detected_classes else "NONE"
+        try:
+            st.session_state.mqttc.publish(os.getenv("MQTT_TOPIC"), msg)
+            st.sidebar.success(f"Published: {msg}")
+        except Exception as e:
+            st.sidebar.error(f"MQTT Error: {str(e)}")
 
 # ===== Image Upload =====
 if input_type == "Image Upload":
@@ -122,6 +130,15 @@ if input_type == "Image Upload":
         results = model.predict(image_np)
         st.image(results[0].plot(), caption="Processed Image", use_column_width=True)
 
+        # Publish detected classes for image
+        detected_classes = set()
+        for result in results:
+            for box in result.boxes:
+                cls_id = int(box.cls.item())
+                detected_classes.add(model.names[cls_id])
+        
+        VideoProcessor().publish_detection(detected_classes)
+
 # ===== Video Upload =====
 elif input_type == "Video Upload":
     video_file = st.file_uploader("Upload Video", type=["mp4", "avi", "mov"])
@@ -132,7 +149,8 @@ elif input_type == "Video Upload":
         
         cap = cv2.VideoCapture(tfile.name)
         stframe = st.empty()
-        
+        last_publish = 0  # Track last publish time
+
         while cap.isOpened():
             ret, frame = cap.read()
             if not ret:
@@ -140,6 +158,18 @@ elif input_type == "Video Upload":
             
             results = model.predict(frame)
             stframe.image(results[0].plot(), channels="BGR")
+
+            # Throttled MQTT publishing
+            current_time = time.time()
+            if current_time - last_publish >= PUBLISH_INTERVAL:
+                detected_classes = set()
+                for result in results:
+                    for box in result.boxes:
+                        cls_id = int(box.cls.item())
+                        detected_classes.add(model.names[cls_id])
+                
+                VideoProcessor().publish_detection(detected_classes)
+                last_publish = current_time
         
         cap.release()
 
