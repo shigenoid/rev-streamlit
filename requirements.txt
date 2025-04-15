@@ -4,3 +4,10 @@ opencv-python-headless
 pillow
 paho-mqtt 
 python-dotenv
+cv2
+numpy
+PIL
+tempfile
+os
+dotenv
+time
