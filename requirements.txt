@@ -1,21 +1,11 @@
-# Core requirements
-streamlit==1.28.0
-numpy==1.24.3
-Pillow==9.5.0
+streamlit>=1.28.0
+opencv-python-headless>=4.7.0 
+numpy>=1.24.3
+Pillow>=9.5.0
 
-# Computer Vision
-opencv-python-headless==4.7.0.72  # Must use headless version for cloud deployment
+ultralytics>=8.0.0
+torch>=2.0.0 
 
-# YOLO
-ultralytics==8.0.203
-torch==2.0.1
+paho-mqtt>=1.6.1
 
-# MQTT
-paho-mqtt==1.6.1
-
-# Environment
-python-dotenv==1.0.0
-
-# Compatibility
-protobuf==3.20.3
-PyYAML==5.4.1
+python-dotenv>=1.0.0
